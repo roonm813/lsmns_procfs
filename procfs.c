@@ -39,8 +39,13 @@ static int parse_lsmns_procfs(void)
 		return types;
 	char* tmp = kmalloc(len, GFP_ATOMIC);
 	strlcpy(tmp, lsm_buff, len);
-	char* str = &tmp[0];
+	int i; 
+	for(i = 0; i < len; i++){
+		if(tmp[i] == ' ' || tmp[i] == '\n' || tmp[i] == '\r')
+			tmp[i] = ',';
+	}	
 
+	char* str = &tmp[0];
 	while((p = strsep(&str, ",")) != NULL){
                 printk(KERN_INFO "%s", p);
                 if (!*p)
