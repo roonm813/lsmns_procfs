@@ -5,6 +5,8 @@
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/parser.h>
+//#include <linux/rwlock_types.h>
+#include <linux/rwlock.h>
 
 #define LEN 1024
 #define LSM_NS_SELINUX          0x00000001
@@ -27,6 +29,7 @@ const match_table_t tokens = {
 
 struct proc_dir_entry *proc_lsm;
 char lsm_buff[LEN];
+static rwlock_t buff_lock;
 
 static int parse_lsmns_procfs(void)
 {
@@ -34,16 +37,22 @@ static int parse_lsmns_procfs(void)
         substring_t args[MAX_OPT_ARGS];
         char* p;
         int token;
+	read_lock(&buff_lock);
 	int len = strlen(lsm_buff);
+	read_unlock(&buff_lock);
 	if(len == 0)
 		return types;
 	char* tmp = kmalloc(len, GFP_ATOMIC);
+
+	read_lock(&buff_lock);
 	strlcpy(tmp, lsm_buff, len);
-	int i; 
+	read_unlock(&buff_lock); 
+
+	int i;
 	for(i = 0; i < len; i++){
 		if(tmp[i] == ' ' || tmp[i] == '\n' || tmp[i] == '\r' || tmp[i] == '.')
 			tmp[i] = ',';
-	}	
+	}
 
 	char* str = &tmp[0];
 	while((p = strsep(&str, ",")) != NULL){
@@ -79,19 +88,30 @@ static int parse_lsmns_procfs(void)
 static ssize_t lsmns_read(struct file* fp, char __user *user_buff,
                size_t count, loff_t *position)
 {
+	ssize_t size;
         parse_lsmns_procfs();
         printk(KERN_INFO "read_called\n");
-        return simple_read_from_buffer(user_buff, count, position, lsm_buff, LEN);
+
+	read_lock(&buff_lock);
+	size = simple_read_from_buffer(user_buff, count, position, lsm_buff, LEN);
+	read_unlock(&buff_lock);
+
+	return size;
 }
 
 static ssize_t lsmns_write(struct file* fp, const char __user *user_buff,
                 size_t count, loff_t *position)
 {
         printk(KERN_INFO "write called\n");
+	ssize_t size = 0;
         if(count > LEN)
                 return -EINVAL;
+	write_lock(&buff_lock);
 	memset(lsm_buff, 0, LEN);
-        return simple_write_to_buffer(lsm_buff, LEN, position, user_buff, count);
+        size = simple_write_to_buffer(lsm_buff, LEN, position, user_buff, count);
+	write_unlock(&buff_lock);
+
+	return size;
 }
 
 struct file_operations proc_fops = {
@@ -102,7 +122,8 @@ struct file_operations proc_fops = {
 int proc_init(void)
 {
         proc_lsm = proc_create_data("lsmns", 0666, NULL, &proc_fops, "test");
-        printk(KERN_INFO "proc_init success\n");
+       	rwlock_init(&buff_lock);
+	printk(KERN_INFO "proc_init success\n");
         return 0;
 }
 
