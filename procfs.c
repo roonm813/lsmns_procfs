@@ -41,7 +41,7 @@ static int parse_lsmns_procfs(void)
 	strlcpy(tmp, lsm_buff, len);
 	int i; 
 	for(i = 0; i < len; i++){
-		if(tmp[i] == ' ' || tmp[i] == '\n' || tmp[i] == '\r')
+		if(tmp[i] == ' ' || tmp[i] == '\n' || tmp[i] == '\r' || tmp[i] == '.')
 			tmp[i] = ',';
 	}	
 
