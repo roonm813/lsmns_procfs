@@ -35,6 +35,8 @@ static int parse_lsmns_procfs(void)
         char* p;
         int token;
 	int len = strlen(lsm_buff);
+	if(len == 0)
+		return types;
 	char* tmp = kmalloc(len, GFP_ATOMIC);
 	strlcpy(tmp, lsm_buff, len);
 	char* str = &tmp[0];
@@ -61,7 +63,7 @@ static int parse_lsmns_procfs(void)
 	while(types){
 		if(types & 1)
 			printk(KERN_INFO "1");
-		else 
+		else
 			printk(KERN_INFO "0");
 		types >>= 1;
 	}
@@ -72,7 +74,7 @@ static int parse_lsmns_procfs(void)
 static ssize_t lsmns_read(struct file* fp, char __user *user_buff,
                size_t count, loff_t *position)
 {
-        int types = parse_lsmns_procfs();
+        parse_lsmns_procfs();
         printk(KERN_INFO "read_called\n");
         return simple_read_from_buffer(user_buff, count, position, lsm_buff, LEN);
 }
@@ -83,6 +85,7 @@ static ssize_t lsmns_write(struct file* fp, const char __user *user_buff,
         printk(KERN_INFO "write called\n");
         if(count > LEN)
                 return -EINVAL;
+	memset(lsm_buff, 0, LEN);
         return simple_write_to_buffer(lsm_buff, LEN, position, user_buff, count);
 }
 
